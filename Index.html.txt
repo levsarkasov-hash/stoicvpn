@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>StoicVPN // Mobile HUD Client</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+        }
+        body {
+            font-family: 'IBM Plex Mono', monospace;
+            background-color: #030303;
+            color: #00ff66;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            user-select: none;
+            padding: 10px;
+        }
+        .hidden { display: none !important; }
+        .phone-shell {
+            width: 100%;
+            max-width: 350px;
+            height: 580px;
+            background-color: #000000;
+            border: 4px solid #00220a;
+            border-radius: 36px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 20px 45px rgba(0,0,0,0.9);
+        }
+        .phone-header {
+            width: 100%;
+            padding: 14px 20px 10px 20px;
+            background-color: #000000;
+            border-bottom: 1px solid #001504;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 9px;
+            color: #008833;
+            flex-shrink: 0;
+            letter-spacing: 0.5px;
+        }
+        .phone-header-dot { width: 6px; height: 6px; background-color: #00ff66; border-radius: 50%; display: inline-block; }
+        .phone-main-scroll { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+        .phone-quote-widget { background-color: #000502; border: 1px solid #001504; padding: 10px 12px; font-size: 12px; cursor: pointer; }
+        .phone-quote-widget span { font-size: 8px; color: #008833; display: block; margin-bottom: 3px; }
+        .phone-quote-widget p { color: #ffffff; text-transform: uppercase; line-height: 1.4; letter-spacing: 0.6px; filter: drop-shadow(0 0 2px rgba(0, 136, 51, 0.5)); transition: filter 0.25s ease; }
+        .phone-quote-widget.active p { filter: drop-shadow(0 0 6px rgba(0, 255, 102, 0.85)); }
+        .phone-shield-center { border: 1px solid #001504; padding: 12px 10px; display: flex; flex-direction: column; align-items: center; background-color: #000000; }
+        .phone-status-label { font-size: 11px; color: #008833; letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase; }
+        .phone-status-label.active { color: #00ff66; text-shadow: 0 0 8px rgba(0, 255, 102, 0.6); }
+        .radar-globe-wrapper { position: relative; width: 124px; height: 124px; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 10; }
+        .radar-globe-svg { position: absolute; width: 100%; height: 100%; top: 0; left: 0; overflow: visible; }
+        .radar-globe-svg circle, .radar-globe-svg ellipse, .radar-globe-svg line { fill: none; stroke: #003311; stroke-width: 1px; vector-effect: non-scaling-stroke; transition: stroke 0.25s ease; }
+        .radar-globe-svg line.axis-line { stroke-dasharray: 2 3; }
+        .radar-core-info { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; z-index: 15; pointer-events: none; width: 100%; height: 100%; top: 0; left: 0; }
+        .radar-core-dot { width: 5px; height: 5px; background-color: #00ff66; border-radius: 50%; margin-bottom: 5px; opacity: 0.4; transition: all 0.25s ease; }
+        .radar-core-text { font-size: 12px; color: #008833; letter-spacing: 1px; text-transform: uppercase; background-color: #000000; padding: 1px 5px; margin-top: 2px; }
+        .radar-sweep-ray { position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 1px solid #00ff66; opacity: 0; transform: scale(1); }
+        @keyframes radar-sweep { 0% { transform: scale(0.95); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 0.1; } 100% { transform: scale(0.95); opacity: 0; } }
+        .radar-globe-wrapper.active .radar-globe-svg circle, .radar-globe-wrapper.active .radar-globe-svg ellipse, .radar-globe-wrapper.active .radar-globe-svg line { stroke: #00ff66; filter: drop-shadow(0 0 2px rgba(0,255,102,0.4)); }
+        .radar-globe-wrapper.active .radar-core-dot { background-color: #ffffff; opacity: 1; box-shadow: 0 0 6px #00ff66, 0 0 12px #00ff66; }
+        .radar-globe-wrapper.active .radar-core-text { color: #ffffff; text-shadow: 0 0 4px #00ff66; }
+        .radar-globe-wrapper.active .radar-sweep-ray { animation: radar-sweep 2s infinite linear; }
+        .node-tag { width: 100%; text-align: center; background-color: #000502; border: 1px solid #00220a; padding: 5px; font-size: 10px; margin-top: 10px; color: #006622; text-transform: uppercase; letter-spacing: 0.5px; }
+        .node-tag.active { color: #ffffff; border-color: #00551a; text-shadow: 0 0 4px #00ff66; }
+        .phone-metrics-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex-shrink: 0; }
+        .phone-metric-item { background-color: #000000; border: 1px solid #001504; padding: 8px 10px; font-size: 9px; }
+        .phone-metric-item span { color: #008833; display: block; text-transform: uppercase; }
+        .phone-metric-item p { color: #00ff66; margin-top: 2px; }
+        .features-hud-list { display: flex; flex-direction: column; gap: 9px; background-color: #000000; border: 1px solid #001504; padding: 12px; flex: 1; justify-content: center; }
+        .feature-hud-item { display: flex; align-items: center; gap: 10px; font-size: 10px; letter-spacing: 0.7px; text-transform: uppercase; color: #00ff66; }
+        .feature-hud-item svg { width: 13px; height: 13px; fill: currentColor; flex-shrink: 0; }
+        .feature-hud-item.inactive { color: #003311; }
+        .phone-section-card { background-color: #000000; border: 1px solid #001504; padding: 14px; display: flex; flex-direction: column; gap: 10px; height: 100%; justify-content: center; }
+        .phone-card-header { font-size: 10px; color: #008833; text-transform: uppercase; }
+        .native-label { font-size: 9px; color: #008833; display: block; margin-bottom: 2px; text-transform: uppercase; }
+        .cyber-input-wrapper { position: relative; width: 100%; display: flex; align-items: center; }
+        .cyber-capsule-input { width: 100%; height: 40px; background-color: #020f05; border: 2px solid #1a3a20; border-radius: 20px; padding: 0 42px 0 16px; font-size: 12px; color: #00ff66; font-family: 'IBM Plex Mono', monospace; outline: none; transition: all 0.2s ease; caret-color: #00ff66; }
+        .cyber-capsule-input:focus { border-color: #00ff66; box-shadow: 0 0 8px rgba(0, 255, 102, 0.25); background-color: #041708; }
+        .cyber-capsule-input::placeholder { color: #00441b; }
+        .cyber-capsule-action-btn { position: absolute; right: 5px; top: 5px; width: 30px; height: 30px; border-radius: 50%; background-color: #162f1a; border: 1px solid #224c2a; color: #005522; cursor: not-allowed; display: flex; align-items: center; justify-content: center; transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); outline: none; }
+        .cyber-capsule-action-btn svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.5; transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        .cyber-input-wrapper-active .cyber-capsule-action-btn { background-color: #00ff66; border-color: #00ff66; color: #000000; box-shadow: 0 0 10px rgba(0, 255, 102, 0.6); cursor: pointer; }
+        .cyber-input-wrapper-active .cyber-capsule-action-btn svg { transform: rotate(-90deg); stroke: #000000; }
+        .phone-tabbar { height: 54px; background-color: #000000; border-top: 1px solid #00220a; display: grid; grid-template-columns: 1fr 1fr 1fr; flex-shrink: 0; }
+        .tabbar-item { background: transparent; border: none; color: #008833; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font-family: 'IBM Plex Mono', monospace; outline: none; }
+        .tabbar-item.active { color: #00ff66; background-color: #000d03; }
+        .tabbar-item-icon { font-size: 14px; }
+        .tabbar-item-caption { font-size: 7px; letter-spacing: 0.3px; margin-top: 2px; text-transform: uppercase; }
+        .toast-notify { position: absolute; top: 45px; left: 12px; right: 12px; background-color: #000000; border: 1px solid #00ff66; color: #00ff66; padding: 10px; font-size: 11px; z-index: 200; display: flex; align-items: center; gap: 8px; transform: translateY(-80px); opacity: 0; transition: all 0.3s ease; }
+        .toast-notify.visible { transform: translateY(0); opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <div class="phone-shell">
+        <div id="mobile-toast-box" class="toast-notify"><span>&gt;_</span><span id="mobile-toast-msg">HUD_READY</span></div>
+        
+        <header class="phone-header">
+            <div>STOIC_NET // MOBILE_HUD</div>
+            <div style="display:flex; align-items:center; gap:4px;"><span>SECURE</span><span class="phone-header-dot"></span></div>
+        </header>
+        
+        <main class="phone-main-scroll">
+            <div id="m-view-dashboard" style="display: flex; flex-direction: column; gap: 10px; height: 100%;">
+                <div class="phone-quote-widget" id="m-quote-container" onclick="rollNewQuote()">
+                    <span>// AM_LOGOS (ТАП ДЛЯ ОБНОВЛЕНИЯ)</span>
+                    <p id="m-quote-text">«СКОЛЬКО БЫ ВРЕДА НИ ПРИНЕСЛИ ТЕБЕ ДРУГИЕ, ОНИ НЕ МОГУТ ПОВРЕДИТЬ ТВОЕМУ РАЗУМУ». — МАРК АВРЕЛИЙ</p>
+                </div>
+                
+                <div class="phone-shield-center">
+                    <div id="m-status-title" class="phone-status-label">STATUS: OFFLINE</div>
+                    <div class="radar-globe-wrapper" id="m-radar-trigger" onclick="triggerMobileVPN()">
+                        <div class="radar-sweep-ray"></div>
+                        <svg class="radar-globe-svg" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="48"></circle>
+                            <ellipse cx="50" cy="50" rx="32" ry="48"></ellipse>
+                            <ellipse cx="50" cy="50" rx="16" ry="48"></ellipse>
+                            <line x1="50" y1="2" x2="50" y2="98" class="axis-line"></line>
+                            <line x1="2" y1="50" x2="98" y2="50" class="axis-line"></line>
+                        </svg>
+                        <div class="radar-core-info">
+                            <div class="radar-core-dot"></div>
+                            <div class="radar-core-text" id="m-radar-label">шум</div>
+                        </div>
+                    </div>
+                    <div class="node-tag" id="m-node-location-tag">ATHENS // POIKILE</div>
+                </div>
+                
+                <div class="phone-metrics-row">
+                    <div class="phone-metric-item"><span>ПОТОК:</span><p id="m-val-traffic">0.00 MB</p></div>
+                    <div class="phone-metric-item"><span>CORE_IP:</span><p>192.168.1.55</p></div>
+                </div>
+
+                <div class="features-hud-list">
+                    <div class="feature-hud-item inactive" id="m-f1"><svg viewBox="0 0 24 24"><path d="M21 11c0-4.97-4.03-9-9-9S3 6.03 3 11c0 2.76 1.24 5.22 3.2 6.9l1.41-1.41C6.23 15.15 5.5 13.17 5.5 11c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5c0 2.17-.73 4.15-2.11 5.49l1.42 1.42C19.76 16.22 21 13.76 21 11zm-9 3c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"/></svg><span>OFFLINE COMMUNICATION</span></div>
+                    <div class="feature-hud-item inactive" id="m-f2"><svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg><span>END-TO-END ENCRYPTION</span></div>
+                    <div class="feature-hud-item inactive" id="m-f4"><svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg><span>NO TRACKING CONTEXT</span></div>
+                    <div class="feature-hud-item inactive" id="m-f6"><svg viewBox="0 0 24 24"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg><span style="color: #ff5566;">PANIC MODE TRIGGER</span></div>
+                </div>
+            </div>
+
+            <div id="m-view-morning" class="hidden">
+                <div class="phone-section-card">
+                    <span class="phone-card-header" style="margin-bottom: 8px;">// LOGOS_FILTER</span>
+                    <div class="cyber-input-wrapper" id="m-wrapper-input-m-mob">
+                        <input type="text" placeholder="Введите сообщение..." class="cyber-capsule-input" oninput="toggleInputCursorAnimation('m-wrapper-input-m-mob', this)">
+                        <button onclick="fireMobileToast('Фильтр разума запущен')" class="cyber-capsule-action-btn"><svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="m-view-evening" class="hidden">
+                <div class="phone-section-card">
+                    <span class="phone-card-header" style="margin-bottom: 6px;">// PM_REVIEW</span>
+                    <label class="native-label">1. Ошибка дня:</label>
+                    <div class="cyber-input-wrapper" id="m-wrapper-ev1-mob">
+                        <input type="text" id="m-evening-q1" placeholder="Введите сообщение..." class="cyber-capsule-input" oninput="toggleInputCursorAnimation('m-wrapper-ev1-mob', this)">
+                        <button onclick="fireMobileToast('Лог 1 зафиксирован')" class="cyber-capsule-action-btn"><svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+                    </div>
+                    <label class="native-label" style="margin-top: 6px;">2. Успех щита:</label>
+                    <div class="cyber-input-wrapper" id="m-wrapper-ev2-mob">
+                        <input type="text" id="m-evening-q2" placeholder="Введите сообщение..." class="cyber-capsule-input" oninput="toggleInputCursorAnimation('m-wrapper-ev2-mob', this)">
+                        <button onclick="fireMobileToast('Лог 2 зафиксирован')" class="cyber-capsule-action-btn"><svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <nav class="phone-tabbar">
+            <button onclick="setMobilePanel('dashboard')" id="m-btn-dashboard" class="tabbar-item active"><span class="tabbar-item-icon">Σ</span><span class="tabbar-item-caption">PORTAL</span></button>
+            <button onclick="setMobilePanel('morning')" id="m-btn-morning" class="tabbar-item"><span class="tabbar-item-icon">▲</span><span class="tabbar-item-caption">AM_SHIELD</span></button>
+            <button onclick="setMobilePanel('evening')" id="m-btn-evening" class="tabbar-item"><span class="tabbar-item-icon">▼</span><span class="tabbar-item-caption">PM_REVIEW</span></button>
+        </nav>
+    </div>
+
+    <script>
+        const stoicQuotesDB = [
+            "«НЕ СОБЫТИЯ РАССТРАИВАЮТ ЛЮДЕЙ, А ТО, КАК ОНИ ЭТИ СОБЫТИЯ ОЦЕНИВАЮТ». — ЭПИКТЕТ",
+            "«ЛУЧШЕЕ ЛЕКАРСТВО ОТ ГНЕВА — ОТСРОЧКА». — СЕНЕКА",
+            "«У ТЕБЯ ЕСТЬ ВЛАСТЬ НАД СВОИМ РАЗУМОМ, А НЕ НАД ВНЕШНИМИ СОБЫТИЯМИ. ОСОЗНАЙ ЭТО, И ТЫ НАЙДЕШЬ СИЛУ». — МАРК АВРЕЛИЙ",
+            "«СКОЛЬКО БЫ ВРЕДА НИ ПРИНЕСЛИ ТЕБЕ ДРУГИЕ, ОНИ НЕ МОГУТ ПОВРЕДИТЬ ТВОЕМУ РАЗУМУ». — МАРК АВРЕЛИЙ"
+        ];
+
+        function toggleInputCursorAnimation(wrapperId, inputEl) {
+            const wrapper = document.getElementById(wrapperId);
+            if (inputEl.value.length > 0) wrapper.classList.add('cyber-input-wrapper-active');
+            else wrapper.classList.remove('cyber-input-wrapper-active');
+        }
+
+        function rollNewQuote() {
+            const randomIndex = Math.floor(Math.random() * stoicQuotesDB.length);
+            document.getElementById('m-quote-text').innerText = stoicQuotesDB[randomIndex];
+        }
+
+        function updateFeaturesHUDLights(isActive) {
+            const list = isActive ? ['1','2','4','6'] : [];
+            ['1','2','4','6'].forEach(i => {
+                const el = document.getElementById('m-f'+i);
+                if(el) el.classList.toggle('inactive', !list.includes(i));
+            });
+            document.getElementById('m-node-location-tag').classList.toggle('active', isActive);
+            document.getElementById('m-quote-container').classList.toggle('active', isActive);
+        }
+
+        let mVpn = false, mTim = null, mCnt = 0;
+        function setMobilePanel(pName) { 
+            ['dashboard', 'morning', 'evening'].forEach(p => { 
+                document.getElementById('m-view-'+p).classList.toggle('hidden', p !== pName); 
+                document.getElementById('m-btn-'+p).classList.toggle('active', p === pName); 
+            }); 
+        }
+
+        function triggerMobileVPN() {
+            mVpn = !mVpn; 
+            const wrapper = document.getElementById('m-radar-trigger');
+            const t = document.getElementById('m-status-title');
+            const lbl = document.getElementById('m-radar-label');
+            updateFeaturesHUDLights(mVpn);
+            if (mVpn) { 
+                wrapper.classList.add('active'); lbl.innerText = 'покой'; t.innerText = 'STATUS: ACTIVE'; t.classList.add('active'); 
+                mTim = setInterval(() => { mCnt += 0.22; document.getElementById('m-val-traffic').innerText = mCnt.toFixed(2) + " MB"; }, 1000); 
+                fireMobileToast("SHIELD: ACTIVE"); 
+            } else { 
+                wrapper.classList.remove('active'); lbl.innerText = 'шум'; t.innerText = 'STATUS: OFFLINE'; t.classList.remove('active'); 
+                clearInterval(mTim); fireMobileToast("SHIELD: HALTED"); 
+            }
+        }
+
+        function fireMobileToast(msg) { 
+            const c = document.getElementById('mobile-toast-box'); 
+            document.getElementById('mobile-toast-msg').innerText = msg; 
+            c.classList.add('visible'); 
+            setTimeout(() => c.classList.remove('visible'), 2000); 
+        }
+
+        window.onload = function() { rollNewQuote(); };
+    </script>
+</body>
+</html>
